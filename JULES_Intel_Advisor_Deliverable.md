@@ -16,11 +16,12 @@ Overview of deliverable
 
 Overview of Intel Advisor on ARCHER2 and JASMIN
 --------------
-- picture
-- Explanation
-- 
-- GUI - overview
-- Single core performance, at root
+[A2_roofline]: https://github.com/dcaseGH/Markdown_documentation/blob/main/CCE_Archer2_JULES_roofline.png "Roofline Archer2 GL7 CCE"
+
+- The above is a roofline plot for a GL7 run (taken from the rose stem tests) on Archer2, built with the Cray environment. Each point is a loop or function, with the larger yellow ones taking longer walltime in the run than smaller green ones. The x axis (FLOP/byte) measures the work done in a loop divided by the memory fetched, and the y axis is the performance (GLOPS). Diagonal lines are the (DRAM) memory bandwidth, and horizontal are compute bounds, for the AMD node.
+- Ideally the loops will be found to the right of the graph (data locality) and upwards (fast). Most of them in this case are below the memory bandwidth, and could be improved, with the fastest often having the word 'cray' in their name implying that the compiler could use an optimised intrinsic or similar
+- This graph is possibly typical of science codes. To make progress you would want to change either the code or the way it's compiled, and the tool becomes more useful when run in the GUI, with Intel architectures and compilers, so everything below was switched to JASMIN (Archer2 has no native Intel environment and AMD nodes).
+- Single core performance performance is usually at the root of total performance, and so the test case could be run in the GUI: this highlights slower loops and makes 'Advice'
 
 First ideas for code changes
 --------------
@@ -66,16 +67,19 @@ src/science/surface/root_frac_jls_mod.F90
 ``` 
 - Another loop which was highlighted is the above. In the original, the first loop is sequential and does a lot of work, which is expensive
 - In the changed version a temporary vector is made sequentially (although this could presumably be precalculated), and then the iterations of the loop doing the work are independent.
-- This lowers the cost from 0.6s to lower than 0.2s in total, but this example is probably of more use than the above. Getting loops which are independent of the order of calculation allows the compiler scope to optimize the code, especially in the light of the next section of this deliverable, and also opens more doors for parallelization of JULES in general.
+- This lowers the cost from 0.6s to lower than 0.2s in total, but this example is probably of more use than the above. Getting loops which are independent of the order of calculation allows the compiler scope to optimize the code, especially in the light of the next section of this deliverable (vectorization), and also opens more doors for parallelization of JULES in general (threading).
 
 Further observations and compiler flag changes
 --------------
 - JULES is used in critical applications, such as NWP, for which performance isn't the main concern. The default flags (Intel) are `-O2 `, although `-O3` has been used above.
 - It is noticable that a lot of time is spent calculating expensive functions, such as LOG, EXP etc. Whilst this is inherent in JULES equations, options exist to reduce
 - A lot of the code, even without being rewritten, could be compiled with instructions which are specific to the architecture
-- By compiling with `-O3 -fast-transcendentals -fp-model fast=2 -xhost` the performance is better. Accepting that these changes will affect results slightly, 
+- By compiling with `-O3 -fast-transcendentals -fp-model fast=2 -xhost` the performance is better. Accepting that these changes will affect results slightly, which is a concern when reporting numbers, it is seen that originally the code took 57s with 4.0s in vectorized loops, and after rebuilding took 39s with 7.8s in vectorized loops
 
 
 Proposed further work
 --------------
-
+- A goal of the ExaJules is to improve spin-up for the carbon cycle. Given that performance is important, and reproducibility is less so for spin-up, a test case is being developed for the aggressive compilation configuration suggested above. This should give 'real' wallclock performance times and can be checked for scientific accuracy
+- Further loops can be changed, as the bottlenecks will depend on test case and compilation details
+- Alternatively time can be spent investigating parallelization at a higher point
+- Any thing else... (address proposal)
